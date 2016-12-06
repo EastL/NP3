@@ -11,12 +11,18 @@
 #include "util.h"
 #include "host.h"
 
-void html_header()
+void html_head()
 {
+	printf("Content-Type: text/html\n");
+	printf("\n");
+	printf("<html>\n");
 	printf("<head>\n");
 	printf("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=big5\" />\n");
 	printf("<title>Network Programming Homework 3</title>\n");
 	printf("</head>\n");
+	printf("<body bgcolor=#336699>\n");
+	printf("<font face=\"Courier New\" size=2 color=#FFFF99>\n");
+	printf("<table width=\"800\" border=\"1\">\n");
 }
 
 int main()
@@ -92,6 +98,39 @@ int main()
 			FD_SET(s, &afds);
 		}
 	}
+
+	//html
+
+	html_head();
+
+	printf("<tr>\n");
+	for (i = 1; i < 6; i++)
+	{
+		if (host[i] != NULL)
+		{
+			printf("<td>");
+			printf("%s", host[i]->ip);
+			printf("</td>");
+		}
+	}
+	printf("</tr>\n");
+
+	printf("<tr>\n");
+	for (i = 1; i < 6; i++)
+	{
+		if (host[i] != NULL)
+		{
+			printf("<td");
+			printf(" valign=\"top\" id=\"m%d\"", i-1);
+			printf("></td>");
+		}
+	}
+	printf("</tr>\n");
+	printf("/table\n");
+
+	printf("</html>\n");
+
+	
 
 	
 	/*
