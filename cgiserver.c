@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include "util.h"
 #include "host.h"
 
@@ -56,10 +63,37 @@ int main()
 
 	}
 
-	//connect to host
+	//open non-blocking socket 
+
+	fd_set afds, rfds;
+	int nfds = getdtablesize();
+	FD_ZERO(&afds);
+
+	for (i = 1; i < 6; i++)
+	{
+		if (host[i] != NULL)
+		{
+			int s = socket(AF_INET , SOCK_STREAM , 0);
+			struct sockaddr_in server;
+
+			memset(&server, 0, sizeof(server));
+			server.sin_addr.s_addr = inet_addr(host[i]->ip);
+			server.sin_family = AF_INET;
+			server.sin_port = htons(host[i]->port);
+			int flag = fcntl(s, F_GETFL, 0);
+			fcntl(s, F_SETFL, flag | O_NONBLOCK);
+			connect(s, (struct sockaddr *)&server , sizeof(server));
+
+			//set to host
+			host[i]->sock_fd = s;
+			host[i]->server = server;
+
+			//set afds
+			FD_SET(s, &afds);
+		}
+	}
 
 	
-
 	/*
 	i = 0;
 	for (; i < 6; i++)
@@ -69,6 +103,7 @@ int main()
 			printf("%s\n", host[i]->ip);
 			printf("%d\n", host[i]->port);
 			printf("%s\n", host[i]->file);
+			printf("%d\n", host[i]->sock_fd);
 		}
 	}
 	*/
