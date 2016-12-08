@@ -2,4 +2,5 @@
 #define __UTIL__
 
 void split(char ***arr, char *str, char *del, size_t *count);
+void replace_html(char *str);
 #endif

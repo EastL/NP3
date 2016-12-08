@@ -28,3 +28,47 @@ void split(char ***arr, char *str, const char *del, size_t *count)
 	*count = _count;
 	*arr = _arr;
 }
+
+void replace_html(char *str)
+{
+	int count = 0;
+	int h_count = 0;
+	char html[10010];
+	memset(html, 0, 10010);
+	
+	while(str[count] != '\0')
+	{
+		if (str[count] == '\n')
+		{
+			html[h_count++] = '<';
+			html[h_count++] = 'b';
+			html[h_count++] = 'r';
+			html[h_count++] = '>';
+		}
+
+		else if (str[count] == '\r');
+
+		else if (str[count] == '>')
+		{
+			html[h_count++] = '&';
+			html[h_count++] = 'g';
+			html[h_count++] = 't';
+			html[h_count++] = ';';
+		}
+
+		else if (str[count] == '<')
+		{
+			html[h_count++] = '&';
+			html[h_count++] = 'l';
+			html[h_count++] = 't';
+			html[h_count++] = ';';
+		}
+
+		else
+			html[h_count++] = str[count];
+
+		count++;
+	}
+
+	strcpy(str, html);
+}
