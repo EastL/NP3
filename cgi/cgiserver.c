@@ -13,16 +13,24 @@
 
 void html_head()
 {
-	printf("Content-Type: text/html\n");
-	printf("\n");
+	printf("Content-Type: text/html\n\n");
+	fflush(stdout);
 	printf("<html>\n");
+	fflush(stdout);
 	printf("<head>\n");
+	fflush(stdout);
 	printf("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=big5\" />\n");
+	fflush(stdout);
 	printf("<title>Network Programming Homework 3</title>\n");
+	fflush(stdout);
 	printf("</head>\n");
+	fflush(stdout);
 	printf("<body bgcolor=#336699>\n");
+	fflush(stdout);
 	printf("<font face=\"Courier New\" size=2 color=#FFFF99>\n");
+	fflush(stdout);
 	printf("<table width=\"800\" border=\"1\">\n");
+	fflush(stdout);
 }
 
 int main()
@@ -111,26 +119,37 @@ int main()
 		if (host[i] != NULL)
 		{
 			printf("<td>");
+			fflush(stdout);
 			printf("%s", host[i]->ip);
+			fflush(stdout);
 			printf("</td>");
+			fflush(stdout);
 		}
 	}
 	printf("</tr>\n");
+	fflush(stdout);
 
 	printf("<tr>\n");
+	fflush(stdout);
 	for (i = 1; i < 6; i++)
 	{
 		if (host[i] != NULL)
 		{
 			printf("<td");
+			fflush(stdout);
 			printf(" valign=\"top\" id=\"m%d\"", i-1);
+			fflush(stdout);
 			printf("></td>");
+			fflush(stdout);
 		}
 	}
 	printf("</tr>\n");
+	fflush(stdout);
 	printf("</table>\n");
+	fflush(stdout);
 
 	printf("</html>\n");
+	fflush(stdout);
 
 	int complete = 0;
 	while (1)
@@ -178,12 +197,14 @@ int main()
 					}
 					replace_html(next_cmd);
 					printf("<script>document.all['m%d'].innerHTML += \"%% <b> %s</b>\";</script>\n", i-1, next_cmd);
+					fflush(stdout);
 				}
 				
 				else
 				{
 					replace_html(msg);
 					printf("<script>document.all['m%d'].innerHTML += \"%s\";</script>\n", i-1, msg);
+					fflush(stdout);
 				}
 			}
 		}
