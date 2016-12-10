@@ -126,11 +126,12 @@ void exe_cgi(char *url, int fd)
 	dup(fd);
 
 	//execute cgi or print html
-	if (regular_match(file_path, "*.cgi") == 1)
+	if (regular_match(file_path, ".*\\.cgi") == 1)
 	{
 		printf("HTTP/1.1 200 OK\n");
 		char *args[] = {file_path, NULL};
 		int pid = fork();
+		fflush(stdout);
 		if (pid == 0)
 			execvp(file_path, args);
 		else
