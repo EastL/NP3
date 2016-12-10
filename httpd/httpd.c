@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -60,10 +61,104 @@ void exe_cgi(char *url, int fd)
 	char **arr;
 	size_t n;	
 	split(&arr, url, "/", &n);
-	if (n < 2)
+	if (n < 1)
 	{
 		notfound(fd);
 		return;
+	}
+
+	//chang to public_html
+	chdir("/u/other/2017_1/104522052/public_html");
+
+	//set abs path
+	char abpath[1024];
+	memset(abpath, 0, 1024);
+	sprintf(abpath, "/u/other/2017_1/104522052/public_html");
+	setenv("PATH", abpath, 1);
+
+	//files
+	char file_path[256];
+	char html_file[256];
+	char cgi_file[256];
+	char cgi_env[256];
+	memset(file_path, 0, 256);
+	memset(html_file, 0, 256);
+	memset(cgi_file, 0, 256);
+	memset(cgi_env, 0, 256);
+
+	//resolve cgi path and env parameter
+	if (regular_match(url, ".*\\?.*") == 1)
+	{
+		char **cgi_buf;
+		size_t cgi_n;
+		split(&cgi_buf, arr[0], "?", &cgi_n);
+		if (cgi_n < 2)
+		{
+			notfound(fd);
+			return;
+		}
+		strcpy(cgi_file, cgi_buf[0]);
+		strcpy(cgi_env, cgi_buf[1]);
+		setenv("QUERY_STRING", cgi_env, 1);
+		sprintf(file_path, "%s/%s", abpath, cgi_file);
+	}
+	//html path
+	else
+	{
+		strcpy(html_file, arr[0]);
+		sprintf(file_path, "%s/%s", abpath, html_file);
+	}
+
+	printf("path:%s\n", file_path);
+
+	struct stat sb;
+	if(stat(file_path, &sb) == -1)
+	{
+		notfound(fd);
+		return;
+	}
+
+	close(0);
+	close(1);
+	close(2);
+	dup(fd);
+	dup(fd);
+	dup(fd);
+
+	//execute cgi or print html
+	if (regular_match(file_path, "*.cgi") == 1)
+	{
+		printf("HTTP/1.1 200 OK\n");
+		char *args[] = {file_path, NULL};
+		int pid = fork();
+		if (pid == 0)
+			execvp(file_path, args);
+		else
+		{
+			int s;
+			waitpid(pid, &s, 0);
+		}
+	}
+	
+	else
+	{
+		int f_fd;
+		f_fd = open(file_path, O_RDWR, 0);
+		char buf[1024];
+		memset(buf, 0, 1024);
+		
+		printf("HTTP/1.1 200 OK\n");
+		printf("Content-type: text/html\n\n");
+
+		int read_n;
+		read_n = read(f_fd, buf, 1024);
+
+		while(read_n > 0)
+		{
+			write(fd, buf, read_n);
+			memset(buf, 0, 1024);
+			read_n = read(f_fd, buf, 1024);
+		}
 	}
 }
 
@@ -127,7 +222,7 @@ int main()
 				while (read_line(clientfd, buf) > 0)
 				{
 					usleep(100000);
-					printf("%s\n", buf);
+					//printf("%s\n", buf);
 				}
 
 				//set blocking
