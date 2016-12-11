@@ -39,11 +39,11 @@ host_t *host[6];
 void s_split(char ***arr, char *str, const char *del, size_t *count)
 {
 	size_t _count = 0;
-	char buf[10010];
+	char buf[4096];
 	char *_arr[5000];
 	memset(_arr, 0, sizeof(char*) * 5000);
 
-	strncpy(buf, str, 10010);
+	strncpy(buf, str, 4096);
 
 	char *save;
 	char *s = strtok(buf, del);
@@ -67,8 +67,8 @@ void replace_html(char *str)
 {
 	int count = 0;
 	int h_count = 0;
-	char html[10010];
-	memset(html, 0, 10010);
+	char html[4096];
+	memset(html, 0, 4096);
 	
 	while(str[count] != '\0')
 	{
@@ -138,7 +138,7 @@ void html_head(SOCKET s)
 	char buf[128];
 
 	memset(buf, 0, 128);
-	strcpy(buf, "Content-Type: text/html\n\n");
+	strcpy(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
 	send(s, buf, strlen(buf), 0);
 	
 	memset(buf, 0, 128);
@@ -313,11 +313,13 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 	int err, r, cr;
 	size_t n, qn, cn;
 	SOCKET w_socket, s;
-	char buf[10010] = {0}, cbuf[4096] = {0};
+	char buf[4096] = {0};
+	char cbuf[4096] = {0};
 	char **arr, **qarr, **carr;
 	string r_str, q_str;
 	regex reg(".*\\.cgi.*");
-	char send_buf[4096], s_buf[4096], next_cmd[4096];
+	smatch base_match;
+	char send_buf[1024], s_buf[1024], next_cmd[1024], to_buf[1024];
 
 	switch(Message) 
 	{
@@ -412,13 +414,13 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 							//send per line
 							for (int i = 0; i < cn; i++)
 							{
-								memset(s_buf, 0, 4096);
+								memset(s_buf, 0, 1024);
 								strcpy(s_buf, carr[i]);
 
 								if (strncmp(s_buf, "% ", 2) == 0)
 								{
-									memset(next_cmd, 0, 4096);
-									fgets(next_cmd, 4096, host[c]->file_fd);
+									memset(next_cmd, 0, 1024);
+									fgets(next_cmd, 1024, host[c]->file_fd);
 									send(s, next_cmd, strlen(next_cmd), 0);
 									replace_html(next_cmd);
 
@@ -430,7 +432,7 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 
 									for (list<SOCKET>::iterator it = Socks.begin(); it != Socks.end(); ++it)
 									{
-										memset(s_buf, 0, 4096);
+										memset(s_buf, 0, 1024);
 										sprintf(s_buf, "<script>document.all['m%d'].innerHTML += \"%% <b>%s</b>\";</script>\n", c - 1, next_cmd);
 										send(*it, s_buf, strlen(s_buf), 0);
 									}
@@ -440,17 +442,18 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 								{
 									for (list<SOCKET>::iterator it = Socks.begin(); it != Socks.end(); ++it)
 									{
-										memset(s_buf, 0, 4096);
-										sprintf(s_buf, "<script>document.all['m%d'].innerHTML += \"%s<br>\";</script>\n", c - 1, next_cmd);
-										send(*it, s_buf, strlen(s_buf), 0);
+										memset(to_buf, 0, 1024);
+										sprintf(to_buf, "<script>document.all['m%d'].innerHTML += \"%s<br>\";</script>\n", c - 1, s_buf);
+										send(*it, to_buf, strlen(to_buf), 0);
 									}
 								}
 							}
 						}
+						break;
 					}
 			}
-			EditPrintf(hwndEdit, TEXT("aaaaaaaaaaaaaaaaaa\n"));
 			break;
+	
 		case WM_SOCKET_NOTIFY:
 			switch( WSAGETSELECTEVENT(lParam) )
 			{
@@ -462,7 +465,7 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 				case FD_READ:
 				//Write your code for read event here.
 					w_socket = wParam;
-					r = recv(w_socket, buf, 10010, 0);
+					r = recv(w_socket, buf, 4096, 0);
 					EditPrintf(hwndEdit, TEXT("recv:\t%s\n"), buf);
 					if (r == 0 || (r == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK))
 					{
@@ -479,7 +482,7 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 					//exe cgi
 					r_str = arr[1];
 					
-					if (strstr(arr[1], "cgi") != NULL)
+					if (regex_match(r_str, reg))
 					{
 						s_split(&qarr, &arr[1][1], "?", &qn);
 						if (qn != 2)
@@ -500,10 +503,10 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 
 						else
 						{
-							memset(send_buf, 0, 4096);
+							memset(send_buf, 0, 1024);
 							strcpy(send_buf, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
 							send(w_socket, send_buf, strlen(send_buf), 0);
-							while (fgets(send_buf, 4096, html_file) != 0)
+							while (fgets(send_buf, 1024, html_file) != 0)
 								send(w_socket, send_buf, strlen(send_buf), 0);
 
 							closesocket(w_socket);
