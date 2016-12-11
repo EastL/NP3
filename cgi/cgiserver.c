@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 #include "util.h"
 #include "host.h"
 
@@ -35,16 +36,18 @@ void html_head()
 
 int main()
 {
-	setenv("QUERY_STRING", "h1=localhost&p1=3451&f1=t1.txt&h2=&p2=&f2=&h3=&p3=&f3=&h4=&p4=&f4=&h5=&p5=&f5=", 1);
+	//setenv("QUERY_STRING", "h1=127.0.0.1&p1=13420&f1=t1.txt&h2=&p2=&f2=&h3=&p3=&f3=&h4=&p4=&f4=&h5=&p5=&f5=", 1);
 
 	char *query = getenv("QUERY_STRING");
 	char **s_array;
 	size_t counter;
 	int nhost = 0;
 	
+	printf("q:%s\n", query);
+	chdir("/u/other/2017_1/104522052/public_html");
 	split(&s_array, query, "&", &counter);
 	//printf("%d\n", counter);
-	//printf("%s\n", s_array[1]);
+	printf("arr1:%s\n", s_array[0]);
 	if (counter != 15)
 	{
 		printf("wrong input format!\n");
@@ -70,6 +73,7 @@ int main()
 			temp->port = atoi(&s_array[index*3+1][3]);
 			strcpy(temp->file, &s_array[index*3+2][3]);
 			temp->file_fd = fopen(temp->file, "r");
+			temp->connected = 0;
 			host[i] = temp;
 			nhost++;
 		}
@@ -98,7 +102,20 @@ int main()
 			server.sin_port = htons(host[i]->port);
 			int flag = fcntl(s, F_GETFL, 0);
 			fcntl(s, F_SETFL, flag | O_NONBLOCK);
-			connect(s, (struct sockaddr *)&server , sizeof(server));
+
+			if (connect(s, (struct sockaddr *)&server , sizeof(server)) < 0)
+			{
+				if (errno != EINPROGRESS)
+				{
+					printf("Errno : %d\n", errno);
+					printf("<h2>connect error.</h2>\n");
+					fflush(stdout);
+					return -1;
+				}
+			}
+	
+			else
+				host[i]->connected = 1;
 
 			//set to host
 			host[i]->sock_fd = s;
@@ -148,9 +165,6 @@ int main()
 	printf("</table>\n");
 	fflush(stdout);
 
-	printf("</html>\n");
-	fflush(stdout);
-
 	int complete = 0;
 	while (1)
 	{
@@ -159,6 +173,15 @@ int main()
 
 		for (i = 1; i < 6; i++)
 		{
+			if (host[i] != NULL && host[i]->connected == 0)
+			{
+				if (connect(host[i]->sock_fd, (struct sockaddr *)&(host[i]->server), sizeof(host[i]->server)) < 0)
+				{
+					if(errno == EISCONN)
+						host[i]->connected = 1;	
+				}
+			}
+
 			if (host[i] != NULL && FD_ISSET(host[i]->sock_fd, &rfds))
 			{
 				//recv msg, end with /r/n
@@ -176,6 +199,7 @@ int main()
 						break;
 				}
 				
+
 				if (counter == 0)
 					continue;
 
@@ -187,7 +211,8 @@ int main()
 					char next_cmd[10010];
 					memset(next_cmd, 0, 10010);
 					fgets(next_cmd, 10010, host[i]->file_fd);
-					if (strncmp(next_cmd, "exit", 4))
+					write(host[i]->sock_fd, next_cmd, strlen(next_cmd));
+					if (strncmp(next_cmd, "exit", 4) == 0)
 					{
 						complete++;
 						FD_CLR(host[i]->sock_fd, &afds);
