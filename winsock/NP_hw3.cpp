@@ -1,7 +1,9 @@
 #include <windows.h>
 #include <list>
 #include <cstring>
+#include <string.h>
 #include <regex>
+#include <errno.h>
 
 using namespace std;
 
@@ -25,12 +27,14 @@ struct _host
 	unsigned int port;
 	char file[30];
 	FILE *file_fd;
-	int sock_fd;
+	SOCKET sock_fd;
 	int connected;
 	struct sockaddr_in server;
 };
 
 typedef struct _host host_t;
+
+host_t *host[6];
 
 void s_split(char ***arr, char *str, const char *del, size_t *count)
 {
@@ -131,48 +135,47 @@ void notfound(SOCKET s)
 
 void html_head(SOCKET s)
 {
-	char buf[64];
+	char buf[128];
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "Content-Type: text/html\n\n");
 	send(s, buf, strlen(buf), 0);
 	
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<html>\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<head>\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=big5\" />\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<title>Network Programming Homework 3</title>\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "</head>\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<body bgcolor=#336699>\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<font face=\"Courier New\" size=2 color=#FFFF99>\n");
 	send(s, buf, strlen(buf), 0);
 
-	memset(buf, 0, 64);
+	memset(buf, 0, 128);
 	strcpy(buf, "<table width=\"800\" border=\"1\">\n");
 	send(s, buf, strlen(buf), 0);
 }
 
 void cgi_server(SOCKET s, HWND hwnd, char *qstring)
 {
-	host_t *host[6];
 	char **s_array;
 	size_t counter;
 	int nhost = 0;
@@ -203,10 +206,93 @@ void cgi_server(SOCKET s, HWND hwnd, char *qstring)
 	
 		else
 			free(temp);
-
 	}
 
 	html_head(s);
+
+	char sbuf[128];
+
+	memset(sbuf, 0, 128);
+	strcpy(sbuf, "<tr>\n");
+	send(s, sbuf, strlen(sbuf), 0);
+
+	for (i = 1; i < 6; i++)
+	{
+		if (host[i] != NULL)
+		{
+			memset(sbuf, 0, 128);
+			strcpy(sbuf, "<td>");
+			send(s, sbuf, strlen(sbuf), 0);
+
+			memset(sbuf, 0, 128);
+			sprintf(sbuf, "%s", host[i]->ip);
+			send(s, sbuf, strlen(sbuf), 0);
+
+			memset(sbuf, 0, 128);
+			strcpy(sbuf, "</td>");
+			send(s, sbuf, strlen(sbuf), 0);
+		}
+	}
+
+	memset(sbuf, 0, 128);
+	strcpy(sbuf, "</tr>\n");
+	send(s, sbuf, strlen(sbuf), 0);
+
+	memset(sbuf, 0, 128);
+	strcpy(sbuf, "<tr>\n");
+	send(s, sbuf, strlen(sbuf), 0);
+
+	for (i = 1; i < 6; i++)
+	{
+		if (host[i] != NULL)
+		{
+			memset(sbuf, 0, 128);
+			strcpy(sbuf, "<td");
+			send(s, sbuf, strlen(sbuf), 0);
+
+			memset(sbuf, 0, 128);
+			sprintf(sbuf, " valign=\"top\" id=\"m%d\"", i-1);
+			send(s, sbuf, strlen(sbuf), 0);
+
+			memset(sbuf, 0, 128);
+			strcpy(sbuf, "></td>");
+			send(s, sbuf, strlen(sbuf), 0);
+		}
+	}
+	memset(sbuf, 0, 128);
+	strcpy(sbuf, "</tr>\n");
+	send(s, sbuf, strlen(sbuf), 0);
+
+	memset(sbuf, 0, 128);
+	strcpy(sbuf, "</table>\n");
+	send(s, sbuf, strlen(sbuf), 0);
+
+	for (int c = 1; c < 6; c++)
+	{
+		if (host[c] != NULL)
+		{
+			SOCKET new_s = socket(AF_INET, SOCK_STREAM, 0);
+			struct sockaddr_in sa;
+			memset(&sa, 0, sizeof(sa));
+
+			sa.sin_family = AF_INET;
+			sa.sin_port = htons(host[c]->port);
+			sa.sin_addr.s_addr = inet_addr(host[c]->ip);
+
+			int err = WSAAsyncSelect(new_s, hwnd, CGI_SOCKET_NOTIFY, FD_CONNECT | FD_CLOSE | FD_READ | FD_WRITE);
+
+			if (connect(new_s, (struct sockaddr *)&sa, sizeof(sa)) < 0)
+			{
+				if (errno != EINPROGRESS && errno != 0)
+				{
+					host[c] = NULL;
+				}
+			}
+
+			if (host[c] != NULL)
+				host[c]->sock_fd = new_s;
+		}
+	}
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -224,14 +310,14 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 	static SOCKET msock, ssock;
 	static struct sockaddr_in sa;
 
-	int err, r;
-	size_t n, qn;
-	SOCKET w_socket;
-	char buf[10010] = {0};
-	char **arr, **qarr;
+	int err, r, cr;
+	size_t n, qn, cn;
+	SOCKET w_socket, s;
+	char buf[10010] = {0}, cbuf[4096] = {0};
+	char **arr, **qarr, **carr;
 	string r_str, q_str;
-	regex reg, q_reg;
-	char send_buf[4096];
+	regex reg(".*\\.cgi.*");
+	char send_buf[4096], s_buf[4096], next_cmd[4096];
 
 	switch(Message) 
 	{
@@ -299,6 +385,72 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 			EndDialog(hwnd, 0);
 			break;
 
+		case CGI_SOCKET_NOTIFY:
+			switch( WSAGETSELECTEVENT(lParam) )
+			{
+				case FD_CONNECT:
+					for (int c = 1; c < 6; c++)
+					{
+						if (host[c] != NULL && host[c]->sock_fd == wParam)
+							host[c]->connected = 1;
+					}
+					break;
+
+				case FD_READ:
+					for (int c = 1; c < 6; c++)
+					{
+						if (host[c] != NULL && host[c]->connected == 1)
+						{
+							s = host[c]->sock_fd;
+							memset(cbuf, 0, 4096);
+
+							cr = recv(s, cbuf, 4096, 0);
+							if (cr <= 0) continue;
+
+							s_split(&carr, cbuf, "\n", &cn);
+
+							//send per line
+							for (int i = 0; i < cn; i++)
+							{
+								memset(s_buf, 0, 4096);
+								strcpy(s_buf, carr[i]);
+
+								if (strncmp(s_buf, "% ", 2) == 0)
+								{
+									memset(next_cmd, 0, 4096);
+									fgets(next_cmd, 4096, host[c]->file_fd);
+									send(s, next_cmd, strlen(next_cmd), 0);
+									replace_html(next_cmd);
+
+									if (strncmp(next_cmd, "exit", 4) == 0)
+									{
+										closesocket(s);
+										host[c] = NULL;
+									}
+
+									for (list<SOCKET>::iterator it = Socks.begin(); it != Socks.end(); ++it)
+									{
+										memset(s_buf, 0, 4096);
+										sprintf(s_buf, "<script>document.all['m%d'].innerHTML += \"%% <b>%s</b>\";</script>\n", c - 1, next_cmd);
+										send(*it, s_buf, strlen(s_buf), 0);
+									}
+								}
+
+								else
+								{
+									for (list<SOCKET>::iterator it = Socks.begin(); it != Socks.end(); ++it)
+									{
+										memset(s_buf, 0, 4096);
+										sprintf(s_buf, "<script>document.all['m%d'].innerHTML += \"%s<br>\";</script>\n", c - 1, next_cmd);
+										send(*it, s_buf, strlen(s_buf), 0);
+									}
+								}
+							}
+						}
+					}
+			}
+			EditPrintf(hwndEdit, TEXT("aaaaaaaaaaaaaaaaaa\n"));
+			break;
 		case WM_SOCKET_NOTIFY:
 			switch( WSAGETSELECTEVENT(lParam) )
 			{
@@ -326,8 +478,8 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 
 					//exe cgi
 					r_str = arr[1];
-					reg = ".*\\.cgi.*";
-					if (regex_match(r_str, reg))
+					
+					if (strstr(arr[1], "cgi") != NULL)
 					{
 						s_split(&qarr, &arr[1][1], "?", &qn);
 						if (qn != 2)
