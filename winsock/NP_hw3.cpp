@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string.h>
 #include <regex>
+#include <algorithm>
 #include <errno.h>
 
 using namespace std;
@@ -35,6 +36,7 @@ struct _host
 typedef struct _host host_t;
 
 host_t *host[6];
+int nhost = 0;
 
 void s_split(char ***arr, char *str, const char *del, size_t *count)
 {
@@ -61,6 +63,30 @@ void s_split(char ***arr, char *str, const char *del, size_t *count)
 
 	*count = _count;
 	*arr = _arr;
+}
+
+void replace_slash(char *str)
+{
+	int count = 0;
+	int s_count = 0;
+	char slash[1024];
+	memset(slash, 0, 1024);
+
+	while(str[count] != '\0')
+	{
+		if (str[count] == '"')
+		{
+			slash[s_count++] = '\\';
+			slash[s_count++] = '"';
+		}
+
+		else
+			slash[s_count++] = str[count];
+
+		count++;
+	}
+
+	strcpy(str, slash);
 }
 
 void replace_html(char *str)
@@ -178,7 +204,6 @@ void cgi_server(SOCKET s, HWND hwnd, char *qstring)
 {
 	char **s_array;
 	size_t counter;
-	int nhost = 0;
 
 	s_split(&s_array, qstring, "&", &counter);
 
@@ -314,12 +339,13 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 	size_t n, qn, cn;
 	SOCKET w_socket, s;
 	char buf[4096] = {0};
-	char cbuf[4096] = {0};
+	char cbuf[1024] = {0};
 	char **arr, **qarr, **carr;
-	string r_str, q_str;
+	string r_str, q_str, re_str;
 	regex reg(".*\\.cgi.*");
 	smatch base_match;
 	char send_buf[1024], s_buf[1024], next_cmd[1024], to_buf[1024];
+	int counter(0);
 
 	switch(Message) 
 	{
@@ -404,18 +430,20 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 						if (host[c] != NULL && host[c]->connected == 1)
 						{
 							s = host[c]->sock_fd;
-							memset(cbuf, 0, 4096);
+							memset(cbuf, 0, 1024);
 
-							cr = recv(s, cbuf, 4096, 0);
+							cr = recv(s, cbuf, 1024, 0);
 							if (cr <= 0) continue;
 
-							s_split(&carr, cbuf, "\n", &cn);
+							s_split(&carr, cbuf, "\r\n", &cn);
+
 
 							//send per line
 							for (int i = 0; i < cn; i++)
 							{
 								memset(s_buf, 0, 1024);
 								strcpy(s_buf, carr[i]);
+								EditPrintf(hwndEdit, TEXT("%s\n"), s_buf);
 
 								if (strncmp(s_buf, "% ", 2) == 0)
 								{
@@ -428,6 +456,7 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 									{
 										closesocket(s);
 										host[c] = NULL;
+										counter++;
 									}
 
 									for (list<SOCKET>::iterator it = Socks.begin(); it != Socks.end(); ++it)
@@ -440,10 +469,13 @@ BOOL CALLBACK MainDlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 
 								else
 								{
+									replace_slash(s_buf);
 									for (list<SOCKET>::iterator it = Socks.begin(); it != Socks.end(); ++it)
 									{
+										EditPrintf(hwndEdit, TEXT("HH%sHH\n"), s_buf);
 										memset(to_buf, 0, 1024);
 										sprintf(to_buf, "<script>document.all['m%d'].innerHTML += \"%s<br>\";</script>\n", c - 1, s_buf);
+										EditPrintf(hwndEdit, TEXT("HH%sHH\n"), s_buf);
 										send(*it, to_buf, strlen(to_buf), 0);
 									}
 								}
