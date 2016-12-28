@@ -69,8 +69,10 @@ int main()
 		int index = i - 1;
 		if (strlen(s_array[index*3]) > 3 && strlen(s_array[index*3 + 1]) > 3 && strlen(s_array[index*3 + 2]) > 3)
 		{
-			strcpy(temp->ip, &s_array[index*3][3]);
-			temp->port = atoi(&s_array[index*3+1][3]);
+			//strcpy(temp->ip, &s_array[index*3][3]);
+			strcpy(temp->ip, "140.113.168.193");
+			//temp->port = atoi(&s_array[index*3+1][3]);
+			temp->port = 13420;
 			strcpy(temp->file, &s_array[index*3+2][3]);
 			temp->file_fd = fopen(temp->file, "r");
 			temp->connected = 0;
@@ -211,6 +213,7 @@ int main()
 					char next_cmd[10010];
 					memset(next_cmd, 0, 10010);
 					fgets(next_cmd, 10010, host[i]->file_fd);
+					usleep(100000);
 					write(host[i]->sock_fd, next_cmd, strlen(next_cmd));
 					if (strncmp(next_cmd, "exit", 4) == 0)
 					{
@@ -227,6 +230,7 @@ int main()
 				
 				else
 				{
+					replace_slash(msg);
 					replace_html(msg);
 					printf("<script>document.all['m%d'].innerHTML += \"%s\";</script>\n", i-1, msg);
 					fflush(stdout);

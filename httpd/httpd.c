@@ -77,14 +77,14 @@ void exe_cgi(char *url, int fd)
 	setenv("PATH", abpath, 1);
 
 	//files
-	char file_path[256];
+	char file_path[2048];
 	char html_file[256];
-	char cgi_file[256];
-	char cgi_env[256];
-	memset(file_path, 0, 256);
+	char cgi_file[1024];
+	char cgi_env[1024];
+	memset(file_path, 0, 2048);
 	memset(html_file, 0, 256);
-	memset(cgi_file, 0, 256);
-	memset(cgi_env, 0, 256);
+	memset(cgi_file, 0, 1024);
+	memset(cgi_env, 0, 1024);
 
 	//resolve cgi path and env parameter
 	if (regular_match(url, ".*\\?.*") == 1)

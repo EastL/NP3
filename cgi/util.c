@@ -72,3 +72,27 @@ void replace_html(char *str)
 
 	strcpy(str, html);
 }
+
+void replace_slash(char *str)
+{
+	int count = 0;
+	int s_count = 0;
+	char slash[1024];
+	memset(slash, 0, 1024);
+
+	while(str[count] != '\0')
+	{
+		if (str[count] == '"')
+		{
+			slash[s_count++] = '\\';
+			slash[s_count++] = '"';
+		}
+
+		else
+			slash[s_count++] = str[count];
+
+		count++;
+	}
+
+	strcpy(str, slash);
+}
